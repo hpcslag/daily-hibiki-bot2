@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"./lib/"
+	"./lib"
 
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -109,6 +109,46 @@ func main() {
 						}
 					}
 				}
+			case "sankaku":
+				//sankaku [page] [preview] [preview-length]
+				args := strings.Split(thisUpdate.Message.Text, " ")
+				if len(args) < 3 {
+					msg := tgbotapi.NewMessage(thisUpdate.Message.Chat.ID, "Please set correct argument, template: /sankaku [page] [preview(0 or 1)], example: /sankaku 1 0")
+					bot.Send(msg)
+				} else {
+					preview := true //limit preview
+					if len(args) >= 2 {
+						if args[2] == "0" {
+							preview = false
+						}
+					}
+
+					images, err := lib.GetSankakuPictures(args[1], preview)
+					if err != nil {
+						msg := tgbotapi.NewMessage(thisUpdate.Message.Chat.ID, "Sorry, I find nothing, please try other page or length range.")
+						bot.Send(msg)
+					} else {
+						if preview && len(args) > 3 {
+							userReqImgLength, err := strconv.Atoi(args[3])
+							if err != nil {
+								userReqImgLength = 1
+							}
+							rangestart := randomInLength(userReqImgLength, len(images))
+							images = images[rangestart : rangestart+userReqImgLength]
+						} else {
+							images = []string{images[randInt(0, len(images))]} //limit length
+						}
+
+						msg := tgbotapi.NewMessage(thisUpdate.Message.Chat.ID, "/// Hibiki Pictures (Sankaku Complex) ///")
+						bot.Send(msg)
+						for _, url := range images {
+							msg := tgbotapi.NewPhotoUpload(thisUpdate.Message.Chat.ID, nil)
+							msg.FileID = url
+							msg.UseExisting = true
+							bot.Send(msg)
+						}
+					}
+				}
 			case "nhentai":
 				//nhentai [cover only (0 or 1)]
 				args := strings.Split(thisUpdate.Message.Text, " ")
@@ -154,4 +194,9 @@ func randomInLength(length int, lengthmax int) int {
 		randomIlgRange = r.Int31n(int32(lengthmax))
 	}
 	return int(randomIlgRange)
+}
+
+func randInt(min int, max int) int {
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(max-min) + min
 }
